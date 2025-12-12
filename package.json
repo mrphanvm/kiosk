@@ -23,7 +23,7 @@
     "dev": "vite",
     "electron": "electron .",
     "dev:electron": "concurrently \"npm run dev\" \"npm run electron\"",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
