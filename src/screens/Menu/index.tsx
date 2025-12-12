@@ -2,7 +2,7 @@
 // src/screens/Menu/index.tsx
 import React, { useMemo } from "react";
 import { motion } from "framer-motion";
-
+import logo from "../../assets/images/logo.png";
 interface MenuProps {
   onCheckin: () => void;
 }
@@ -76,16 +76,7 @@ const Menu: React.FC<MenuProps> = ({ onCheckin }) => {
         >
           e-KYC KIOSK SYSTEM
         </motion.div>
-
-        <motion.h1
-          className="text-4xl font-bold mb-4 tracking-wide"
-          initial={{ opacity: 0, y: -15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.8 }}
-        >
-          Chào mừng bạn 👋
-        </motion.h1>
-
+        <img src={logo} width={250} />
         <motion.p
           className="text-gray-300 max-w-lg leading-relaxed mb-10 text-lg"
           initial={{ opacity: 0 }}

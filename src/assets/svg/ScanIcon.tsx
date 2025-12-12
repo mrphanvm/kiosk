@@ -1,8 +1,8 @@
 import * as React from "react";
 const ScanIcon = (props: any) => (
   <svg
-    width={169}
-    height={150}
+    width={219}
+    height={200}
     viewBox="0 0 169 150"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"

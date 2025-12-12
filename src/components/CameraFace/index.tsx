@@ -12,12 +12,14 @@ interface CameraFaceProps {
   size?: number;
   autoCaptureFrames?: number;
   onCapture?: (img: string) => void;
+  onBack?: () => void;
 }
 
 const CameraFace: React.FC<CameraFaceProps> = ({
   size = 360,
   autoCaptureFrames = 12,
   onCapture,
+  onBack,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -45,6 +47,18 @@ const CameraFace: React.FC<CameraFaceProps> = ({
     void f.offsetHeight;
     f.style.transition = "opacity .45s ease-out";
     f.style.opacity = "0";
+  };
+  const getUsbCameraDeviceId = async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    const cams = devices.filter((d) => d.kind === "videoinput");
+
+    // Ưu tiên camera USB (thường có chữ USB, HD Webcam, C270...)
+    const usb = cams.find((d) =>
+      /usb|hd|logitech|camera|webcam/i.test(d.label)
+    );
+
+    return usb?.deviceId || cams[0]?.deviceId;
   };
 
   // Capture full-resolution frame from video
@@ -587,10 +601,17 @@ const CameraFace: React.FC<CameraFaceProps> = ({
 
     const init = async () => {
       const v = videoRef.current!;
+      const deviceId = await getUsbCameraDeviceId();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 1280, height: 720 },
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: 1280,
+          height: 720,
+        },
       });
-
+      // const stream = await navigator.mediaDevices.getUserMedia({
+      //   video: { facingMode: "user", width: 1280, height: 720 },
+      // });
       v.srcObject = stream;
       await v.play();
 
@@ -620,6 +641,17 @@ const CameraFace: React.FC<CameraFaceProps> = ({
 
   return (
     <div className="w-screen h-screen relative bg-[#05070a] overflow-hidden">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="absolute top-6 left-6 flex items-center gap-2 px-3 py-1 rounded-lg 
+             bg-black/40 backdrop-blur-sm text-cyan-300 hover:text-white 
+             border border-cyan-300/20 hover:border-cyan-200/40 transition z-50"
+        >
+          <span className="text-lg">←</span>
+          <span className="text-sm">Quay lại</span>
+        </button>
+      )}
       <div className="absolute inset-0 bg-gradient-to-b from-[#051018] to-[#020305]" />
 
       {/* CAMERA AREA */}

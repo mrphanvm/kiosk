@@ -5,9 +5,10 @@ import ScanIcon from "../../assets/svg/ScanIcon";
 
 interface Props {
   onNext: (data: any) => void;
+  onBack?: () => void;
 }
 
-const ReadCCCD: React.FC<Props> = ({ onNext }) => {
+const ReadCCCD: React.FC<Props> = ({ onNext, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [cccd, setCccd] = useState<any>(null);
 
@@ -50,6 +51,17 @@ const ReadCCCD: React.FC<Props> = ({ onNext }) => {
   if (loading) {
     return (
       <div className="w-screen h-screen relative overflow-hidden bg-[#04070B] flex flex-col items-center justify-center text-white">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="absolute top-6 left-6 flex items-center gap-2 px-3 py-1 rounded-lg 
+             bg-black/40 backdrop-blur-sm text-cyan-300 hover:text-white 
+             border border-cyan-300/20 hover:border-cyan-200/40 transition z-50"
+          >
+            <span className="text-lg">←</span>
+            <span className="text-sm">Quay lại</span>
+          </button>
+        )}
         {/* BG GRID */}
         <div className="absolute inset-0 opacity-[0.05] bg-[url('/grid.svg')]" />
 
@@ -84,10 +96,9 @@ const ReadCCCD: React.FC<Props> = ({ onNext }) => {
           animate={{ opacity: 1, y: 0 }}
           className="relative z-10 flex flex-col items-center"
         >
-          {/* ICON SCAN CCCD */}
           <ScanIcon />
 
-          {/* LASER SWEEP */}
+          {/* LASER */}
           <motion.div
             className="w-56 h-[3px] bg-gradient-to-r from-cyan-400 to-blue-500 shadow-[0_0_12px_#00dfff] rounded-full"
             animate={{ y: [0, -160, 0] }}
@@ -110,10 +121,10 @@ const ReadCCCD: React.FC<Props> = ({ onNext }) => {
   }
 
   // ---------------------------------------------------------
-  // RESULT SCREEN
+  // RESULT SCREEN — CENTERED
   // ---------------------------------------------------------
   return (
-    <div className="w-screen h-screen relative bg-[#05070A] text-white p-6 overflow-hidden">
+    <div className="w-screen h-screen relative bg-[#05070A] text-white overflow-hidden flex items-center justify-center">
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#07202a] via-[#04141c] to-[#02070c] opacity-90" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,255,200,0.10),transparent_70%)]" />
@@ -145,13 +156,13 @@ const ReadCCCD: React.FC<Props> = ({ onNext }) => {
         />
       ))}
 
-      {/* Info Box */}
-      <div className="relative z-10 max-w-md mx-auto mt-10 bg-[#0c1a22]/60 backdrop-blur-xl p-6 rounded-2xl border border-cyan-400/20 shadow-[0_0_25px_#00fff2]">
+      {/* --- CENTERED BOX --- */}
+      <div className="relative z-10 w-full max-w-md bg-[#0c1a22]/60 backdrop-blur-xl p-6 mx-4 rounded-2xl border border-cyan-400/20 shadow-[0_0_25px_#00fff2]">
         <h1 className="text-2xl font-bold text-center mb-6 text-cyan-300">
           THÔNG TIN CCCD
         </h1>
 
-        {/* Avatar (base64 supported) */}
+        {/* Avatar */}
         {cccd.avatar && (
           <motion.img
             initial={{ opacity: 0, scale: 0.85 }}
@@ -167,7 +178,7 @@ const ReadCCCD: React.FC<Props> = ({ onNext }) => {
           />
         )}
 
-        {/* Info rows */}
+        {/* Rows */}
         <div className="space-y-3 text-base">
           <InfoRow label="Họ tên" value={cccd.name} />
           <InfoRow label="Số CCCD" value={cccd.id} />
