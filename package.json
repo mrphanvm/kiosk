@@ -24,6 +24,7 @@
     "electron": "electron .",
     "dev:electron": "concurrently \"npm run dev\" \"npm run electron\"",
     "build": "vite build",
+    "build:electron": "electron-builder",
     "lint": "eslint .",
     "preview": "vite preview"
   },
