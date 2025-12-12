@@ -2,7 +2,7 @@ name: Build Windows Electron App
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "*" ]
   workflow_dispatch:   # cho phép anh tự bấm build
 
 jobs:
