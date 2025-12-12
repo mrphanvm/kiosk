@@ -2,8 +2,9 @@ name: Build Windows Electron App
 
 on:
   push:
-    branches: [ "*" ]
-  workflow_dispatch:   # cho phép anh tự bấm build
+    branches: [ "**" ]
+
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -11,24 +12,24 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install dependencies
-        run: yarn install
+        run: yarn install --network-timeout 300000
 
       - name: Build Vite (React UI)
         run: yarn build
 
-      - name: Build Electron (Windows installer)
+      - name: Build Electron installer
         run: yarn build:electron --win
 
-      - name: Upload EXE installer
-        uses: actions/upload-artifact@v3
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
         with:
           name: kiosk-windows-installer
           path: dist-electron/**
