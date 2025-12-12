@@ -1,0 +1,34 @@
+name: Build Windows Electron App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:   # cho phép anh tự bấm build
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build Vite (React UI)
+        run: yarn build
+
+      - name: Build Electron (Windows installer)
+        run: yarn build:electron --win
+
+      - name: Upload EXE installer
+        uses: actions/upload-artifact@v3
+        with:
+          name: kiosk-windows-installer
+          path: dist-electron/**

@@ -4,6 +4,21 @@
   "version": "0.0.0",
   "type": "module",
   "main": "electron/main.ts",
+  "build": {
+    "appId": "com.yourcompany.kiosk",
+    "productName": "Kiosk",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**",
+      "electron/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    }
+  },
   "scripts": {
     "dev": "vite",
     "electron": "electron .",
@@ -14,6 +29,7 @@
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
+    "framer-motion": "^12.23.26",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss-animate": "^1.0.7"
