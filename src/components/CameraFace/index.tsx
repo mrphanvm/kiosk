@@ -1,11 +1,8 @@
-// ---------------- CameraFace.tsx (Final Stable + Popup + No Distortion) -------------------
-
 import React, { useEffect, useRef, useState } from "react";
 import {
   FilesetResolver,
   FaceLandmarker,
   type FaceLandmarkerResult,
-  type NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
 
 interface CameraFaceProps {
@@ -29,16 +26,14 @@ const CameraFace: React.FC<CameraFaceProps> = ({
   const runningRef = useRef(true);
   const capturingRef = useRef(false);
 
-  const [msg, setMsg] = useState("Đưa khuôn mặt vào vòng tròn để bắt đầu");
+  const [msg, setMsg] = useState("Đưa khuôn mặt vào khung để bắt đầu");
   const stable = useRef(0);
-
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
-  // FIX Strict Mode timestamp
   const tsRef = useRef(0);
-
-  // FLASH EFFECT
   const flashRef = useRef<HTMLDivElement | null>(null);
+
+  // ---------------- FLASH ----------------
   const flash = () => {
     const f = flashRef.current;
     if (!f) return;
@@ -48,385 +43,155 @@ const CameraFace: React.FC<CameraFaceProps> = ({
     f.style.transition = "opacity .45s ease-out";
     f.style.opacity = "0";
   };
+
+  // ---------------- CAMERA ----------------
   const getUsbCameraDeviceId = async () => {
+    await navigator.mediaDevices.getUserMedia({ video: true });
     const devices = await navigator.mediaDevices.enumerateDevices();
-
     const cams = devices.filter((d) => d.kind === "videoinput");
-
-    // Ưu tiên camera USB (thường có chữ USB, HD Webcam, C270...)
     const usb = cams.find((d) =>
       /usb|hd|logitech|camera|webcam/i.test(d.label)
     );
-
     return usb?.deviceId || cams[0]?.deviceId;
   };
 
-  // Capture full-resolution frame from video
   const captureFrame = (): string | null => {
     const v = videoRef.current;
     if (!v) return null;
     const c = document.createElement("canvas");
     c.width = v.videoWidth;
     c.height = v.videoHeight;
-    c.getContext("2d")!.drawImage(v, 0, 0, c.width, c.height);
+    c.getContext("2d")!.drawImage(v, 0, 0);
     return c.toDataURL("image/jpeg", 0.92);
   };
+  const captureOuterEllipse = (): string | null => {
+    const v = videoRef.current;
+    const wrap = wrapRef.current;
+    if (!v || !wrap) return null;
 
-  // ---------------- ALIGNMENT --------------------
+    const vw = v.videoWidth;
+    const vh = v.videoHeight;
+
+    const cw = wrap.clientWidth;
+    const ch = wrap.clientHeight;
+
+    // object-cover scale (GIỐNG VIDEO HIỂN THỊ)
+    const scale = Math.max(cw / vw, ch / vh);
+    const drawW = vw * scale;
+    const drawH = vh * scale;
+
+    const offsetX = (cw - drawW) / 2;
+    const offsetY = (ch - drawH) / 2;
+
+    // ellipse ngoài (đúng clipPath)
+    const rx = cw * 0.48;
+    const ry = ch * 0.5;
+
+    // output canvas = đúng size ellipse
+    const outW = Math.round(rx * 2);
+    const outH = Math.round(ry * 2);
+
+    const c = document.createElement("canvas");
+    c.width = outW;
+    c.height = outH;
+
+    const ctx = c.getContext("2d")!;
+
+    // (OPTIONAL) nền trắng
+    // ctx.fillStyle = "#fff";
+    // ctx.fillRect(0, 0, outW, outH);
+
+    // mask ellipse ngoài
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(outW / 2, outH / 2, rx, ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+
+    // vẽ video đúng như hiển thị
+    ctx.drawImage(
+      v,
+      offsetX - (cw / 2 - rx),
+      offsetY - (ch / 2 - ry),
+      drawW,
+      drawH
+    );
+
+    ctx.restore();
+
+    // PNG nền trong suốt (chuẩn eKYC)
+    return c.toDataURL("image/png");
+  };
+
+  const captureEllipseFace = (): string | null => {
+    const v = videoRef.current;
+    const wrap = wrapRef.current;
+    if (!v || !wrap) return null;
+
+    const vw = v.videoWidth;
+    const vh = v.videoHeight;
+
+    const cw = wrap.clientWidth;
+    const ch = wrap.clientHeight;
+
+    // object-cover scale
+    const scale = Math.max(cw / vw, ch / vh);
+    const offsetX = (cw - vw * scale) / 2;
+    const offsetY = (ch - vh * scale) / 2;
+
+    // ellipse giống UI
+    const radius = Math.min(cw, ch) * 0.28;
+    const rx = radius * 0.82;
+    const ry = radius * 1.12;
+
+    // canvas xuất
+    const outW = Math.round(rx * 2);
+    const outH = Math.round(ry * 2);
+
+    const c = document.createElement("canvas");
+    c.width = outW;
+    c.height = outH;
+
+    const ctx = c.getContext("2d")!;
+
+    // MASK ellipse
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(outW / 2, outH / 2, rx, ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+
+    // vẽ video đã scale
+    ctx.drawImage(
+      v,
+      offsetX - (cw / 2 - rx),
+      offsetY - (ch / 2 - ry),
+      vw * scale,
+      vh * scale
+    );
+
+    ctx.restore();
+
+    // PNG nền trong suốt (chuẩn eKYC)
+    return c.toDataURL("image/png");
+  };
+
+  // ---------------- ALIGNMENT ----------------
   const isAligned = (
     bbox: { cx: number; cy: number; w: number } | null,
     cw: number,
     ch: number
   ) => {
     if (!bbox) return false;
-
     const outer = Math.min(cw, ch) * 0.28;
     const inner = outer * 0.72;
-
     const dx = bbox.cx - cw / 2;
     const dy = bbox.cy - ch / 2;
     const dist = Math.sqrt(dx * dx + dy * dy);
-
     const inside = dist < inner * 0.75;
     const sizeOK = bbox.w > inner * 0.45 && bbox.w < inner * 1.25;
-
     return inside && sizeOK;
   };
 
-  // ---------------- LANDMARK REDUCTION --------------------
-  // Giảm từ 478 điểm → còn ~70 điểm quan trọng
-  // ~120 landmark đẹp, phân bố mắt – mũi – miệng – jawline – trán – má
-  // ~220 landmark – chi tiết vừa phải, rất đẹp, không lag
-  const landmarkIndexSample = [
-    // === EYES (LEFT + RIGHT) ===
-    33,
-    7,
-    163,
-    144,
-    145,
-    153,
-    154,
-    155,
-    133,
-    173,
-    157,
-    158,
-    159,
-    160,
-    161,
-    246,
-    362,
-    382,
-    381,
-    380,
-    374,
-    373,
-    390,
-    249,
-    263,
-    466,
-    388,
-    387,
-    386,
-    385,
-    384,
-    398,
-
-    // Add additional around-eye contour points
-    130,
-    247,
-    30,
-    29,
-    27,
-    28,
-    56,
-    190,
-    243,
-    112,
-    26,
-    22,
-    23,
-    24,
-    110,
-    463,
-    414,
-    286,
-    258,
-    257,
-    259,
-    260,
-    463,
-    341,
-    359,
-    446,
-    467,
-    468,
-    469,
-
-    // === EYEBROWS (FULL DETAIL) ===
-    65,
-    52,
-    55,
-    70,
-    63,
-    105,
-    66,
-    107, // left brow
-    336,
-    296,
-    334,
-    293,
-    300,
-    276,
-    353,
-    285, // right brow
-    46,
-    124,
-    35,
-    219,
-    220,
-    221,
-    222,
-    276,
-    282,
-    283,
-    284,
-    295,
-    296,
-    334,
-    293,
-
-    // === NOSE (HIGH DETAIL) ===
-    1,
-    2,
-    98,
-    327,
-    97,
-    168,
-    5,
-    4,
-    351,
-    358,
-    327,
-    197,
-    6,
-    195,
-    197,
-    419,
-    197,
-    196,
-    94,
-    2,
-    98,
-    327,
-    347,
-    348,
-    97,
-    195,
-    168,
-    188,
-    122,
-    217,
-    131,
-    49,
-    279,
-
-    // === MOUTH (FULL OUTER + INNER LIPS) ===
-    61,
-    146,
-    91,
-    181,
-    84,
-    17,
-    314,
-    405,
-    321,
-    375,
-    291,
-    308,
-    78,
-    191,
-    80,
-    81,
-    82,
-    13,
-    311,
-    310,
-    415,
-    308,
-    402,
-    14,
-    86,
-    87,
-    88,
-    178,
-    179,
-    180,
-    183,
-    184,
-    185,
-    311,
-    312,
-    308,
-    324,
-    318,
-    402,
-    317,
-    316,
-
-    // === CHEEKS & FACE SIDE DETAIL ===
-    50,
-    205,
-    187,
-    198,
-    131,
-    132,
-    203,
-    129,
-    127,
-    234,
-    416,
-    418,
-    421,
-    425,
-    427,
-    430,
-    432,
-    434,
-    436,
-    403,
-    358,
-    352,
-    347,
-    346,
-    345,
-    344,
-    443,
-    442,
-    280,
-    425,
-    427,
-    436,
-    435,
-    432,
-    376,
-    375,
-    433,
-
-    // === FOREHEAD DETAIL ===
-    10,
-    338,
-    297,
-    332,
-    284,
-    251,
-    389,
-    356,
-    454,
-    449,
-    123,
-    116,
-    117,
-    118,
-    119,
-    120,
-    247,
-    126,
-    142,
-    151,
-    9,
-    336,
-    296,
-    334,
-    338,
-    297,
-    332,
-    284,
-    251,
-
-    // === JAWLINE (MORE POINTS) ===
-    152,
-    148,
-    176,
-    150,
-    136,
-    172,
-    58,
-    132,
-    93,
-    234,
-    127,
-    205,
-    50,
-    209,
-    198,
-    131,
-    177,
-    215,
-    138,
-    135,
-    150,
-    176,
-    148,
-    152,
-    377,
-    400,
-    378,
-    379,
-    397,
-    365,
-    363,
-    379,
-    378,
-    400,
-    377,
-    152,
-    148,
-    176,
-    149,
-    150,
-
-    // === EXTRA DENSE FACEMESH POINTS (ENHANCE SMOOTHNESS) ===
-    // You can remove a few if too heavy; this is still performant.
-    33,
-    246,
-    161,
-    160,
-    159,
-    158,
-    157,
-    173,
-    133,
-    387,
-    386,
-    385,
-    384,
-    398,
-    362,
-    263,
-    249,
-    466,
-    351,
-    419,
-    351,
-    419,
-    238,
-    456,
-    399,
-    412,
-    357,
-    81,
-    82,
-    13,
-    312,
-    308,
-    291,
-    324,
-    318,
-    402,
-  ];
-
-  // ---------------- DRAW MASK + UI --------------------
+  // ---------------- DRAW UI ----------------
   const drawUI = (
     ctx: CanvasRenderingContext2D,
     result: FaceLandmarkerResult | null,
@@ -436,79 +201,88 @@ const CameraFace: React.FC<CameraFaceProps> = ({
     ts: number
   ) => {
     ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
+
+    // BACKDROP
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(0, 0, cw, ch);
 
     const cx = cw / 2;
     const cy = ch / 2;
 
-    // Main glow ring
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "rgba(0,200,255,0.9)";
-    ctx.shadowColor = "rgba(0,200,255,0.6)";
-    ctx.shadowBlur = 16;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+    // INNER ELLIPSE (KHUNG NHẬN DIỆN)
+    // const rx = radius * 0.72;
+    // const ry = radius * 1.0;
+    // INNER ELLIPSE (KHUNG NHẬN DIỆN) – MỚI
+    const rx = radius * 0.98; // 👈 tăng từ 0.72 → 0.82
+    const ry = radius * 1.7; // 👈 tăng chiều dọc
 
-    // Radar
-    const angle = (ts * 0.12) % 360;
-    const rad = (angle * Math.PI) / 180;
-
+    // CUT OUT
     ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radius * 1.05, rad - 0.22, rad + 0.22);
-    ctx.closePath();
-
-    const g = ctx.createRadialGradient(cx, cy, 10, cx, cy, radius);
-    g.addColorStop(0, "rgba(0,255,200,0.2)");
-    g.addColorStop(1, "rgba(0,255,200,0)");
-    ctx.fillStyle = g;
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    // Face landmarks
+    // GLOW RING
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(0,200,255,0.95)";
+    ctx.shadowColor = "rgba(0,200,255,0.65)";
+    ctx.shadowBlur = 18;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // SCAN ARC
+    const angle = (ts * 0.12) % 360;
+    const rad = (angle * Math.PI) / 180;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx * 1.02, ry * 1.02, 0, rad - 0.25, rad + 0.25);
+    ctx.strokeStyle = "rgba(0,255,200,0.5)";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+
+    // ---------------- FULL LANDMARK (CHẤM NHỎ) ----------------
     if (result?.faceLandmarks?.length) {
       const pts = result.faceLandmarks[0];
       const v = videoRef.current!;
+
       const vw = v.videoWidth;
       const vh = v.videoHeight;
 
-      const scaleX = cw / vw;
-      const scaleY = ch / vh;
+      const scale = Math.max(cw / vw, ch / vh); // 👈 object-cover scale
+      const offsetX = (cw - vw * scale) / 2;
+      const offsetY = (ch - vh * scale) / 2;
 
-      ctx.fillStyle = "rgba(0,255,120,0.8)";
-      ctx.shadowColor = "rgba(0,255,120,0.7)";
-      ctx.shadowBlur = 4;
+      ctx.fillStyle = "rgba(0,255,160,0.75)";
+      ctx.shadowColor = "rgba(0,255,160,0.35)";
+      ctx.shadowBlur = 1.5;
 
-      for (const idx of landmarkIndexSample) {
-        const p = pts[idx];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
         if (!p) continue;
 
-        const px = p.x * vw * scaleX;
-        const py = p.y * vh * scaleY;
+        const px = p.x * vw * scale + offsetX;
+        const py = p.y * vh * scale + offsetY;
 
         ctx.beginPath();
-        ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+        ctx.arc(px, py, 0.6, 0, Math.PI * 2); // chấm nhỏ
         ctx.fill();
       }
+
       ctx.shadowBlur = 0;
     }
   };
 
-  // ---------------- MAIN LOOP --------------------
   const loop = () => {
     if (!runningRef.current) return;
-
     tsRef.current += 16;
 
     const v = videoRef.current;
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
     const detector = detectorRef.current;
-
     if (!v || !wrap || !canvas || !detector) {
       requestAnimationFrame(loop);
       return;
@@ -527,91 +301,63 @@ const CameraFace: React.FC<CameraFaceProps> = ({
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     let result: FaceLandmarkerResult | null = null;
-
     try {
       result = detector.detectForVideo(v, tsRef.current);
     } catch {}
 
-    // Compute bbox
     let bbox: { cx: number; cy: number; w: number } | null = null;
-
     if (result?.faceLandmarks?.length) {
       const pts = result.faceLandmarks[0];
-      const vw = v.videoWidth;
-      const vh = v.videoHeight;
-
-      const scaleX = cw / vw;
-      const scaleY = ch / vh;
-
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
-
-      for (const p of pts) {
-        const px = p.x * vw * scaleX;
-        const py = p.y * vh * scaleY;
-
-        minX = Math.min(minX, px);
-        minY = Math.min(minY, py);
-        maxX = Math.max(maxX, px);
-        maxY = Math.max(maxY, py);
-      }
-
-      bbox = { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: maxX - minX };
+      let minX = 1,
+        minY = 1,
+        maxX = 0,
+        maxY = 0;
+      pts.forEach((p) => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      });
+      bbox = {
+        cx: ((minX + maxX) / 2) * cw,
+        cy: ((minY + maxY) / 2) * ch,
+        w: (maxX - minX) * cw,
+      };
     }
 
     const radius = Math.min(cw, ch) * 0.28;
-
     drawUI(ctx, result, cw, ch, radius, tsRef.current);
 
     const ok = isAligned(bbox, cw, ch);
-
     if (ok && !capturingRef.current) {
       stable.current++;
       setMsg(`Đang căn chỉnh... (${stable.current}/${autoCaptureFrames})`);
     } else {
       stable.current = 0;
-      if (!capturingRef.current)
-        setMsg("Đưa khuôn mặt vào vòng tròn để bắt đầu");
+      if (!capturingRef.current) setMsg("Đưa khuôn mặt vào khung để bắt đầu");
     }
 
-    // Capture once
     if (ok && stable.current >= autoCaptureFrames && !capturingRef.current) {
       capturingRef.current = true;
-
       flash();
-
-      const img = captureFrame();
+      const img = captureOuterEllipse();
       setPreviewImg(img!);
       onCapture?.(img!);
-
-      // KHÔNG STOP CAMERA
-      // Camera + mask vẫn chạy
-
       setMsg("Đã chụp");
     }
 
     requestAnimationFrame(loop);
   };
 
-  // ---------------- INIT --------------------
+  // ---------------- INIT ----------------
   useEffect(() => {
     let mounted = true;
-
     const init = async () => {
       const v = videoRef.current!;
       const deviceId = await getUsbCameraDeviceId();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          width: 1280,
-          height: 720,
-        },
+        video: { deviceId: deviceId ? { exact: deviceId } : undefined },
       });
-      // const stream = await navigator.mediaDevices.getUserMedia({
-      //   video: { facingMode: "user", width: 1280, height: 720 },
-      // });
       v.srcObject = stream;
       await v.play();
 
@@ -628,72 +374,69 @@ const CameraFace: React.FC<CameraFaceProps> = ({
         numFaces: 1,
       });
 
-      if (!mounted) return;
-      requestAnimationFrame(loop);
+      if (mounted) requestAnimationFrame(loop);
     };
-
     init();
-
     return () => {
       mounted = false;
     };
   }, []);
 
+  // ---------------- RENDER ----------------
   return (
     <div className="w-screen h-screen relative bg-[#05070a] overflow-hidden">
       {onBack && (
         <button
           onClick={onBack}
-          className="absolute top-6 left-6 flex items-center gap-2 px-3 py-1 rounded-lg 
-             bg-black/40 backdrop-blur-sm text-cyan-300 hover:text-white 
-             border border-cyan-300/20 hover:border-cyan-200/40 transition z-50"
+          className="absolute top-6 left-6 z-50 text-cyan-300"
         >
-          <span className="text-lg">←</span>
-          <span className="text-sm">Quay lại</span>
+          ← Quay lại
         </button>
       )}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#051018] to-[#020305]" />
 
-      {/* CAMERA AREA */}
       <div className="w-full h-full flex items-center justify-center">
         <div
-          ref={wrapRef}
-          className="relative rounded-full overflow-hidden"
+          className="relative"
           style={{
             width: size,
-            height: size,
+            height: size * 1.25,
+            filter: "drop-shadow(0 0 30px rgba(0,255,255,0.15))",
           }}
         >
-          <video
-            ref={videoRef}
-            className="absolute inset-0 w-full h-full object-cover"
-            playsInline
-            muted
-          />
-
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 pointer-events-none"
-          />
+          <div
+            ref={wrapRef}
+            className="absolute inset-0 overflow-hidden"
+            style={{
+              clipPath: "ellipse(48% 50% at 50% 50%)",
+            }}
+          >
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover"
+              playsInline
+              muted
+            />
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 pointer-events-none"
+            />
+          </div>
         </div>
       </div>
 
-      {/* FLASH */}
       <div
         ref={flashRef}
         className="absolute inset-0 bg-white pointer-events-none"
         style={{ opacity: 0 }}
       />
 
-      {/* STATUS */}
-      <div className="absolute bottom-12 w-full text-center text-white/90 text-sm">
+      <div className="absolute bottom-12 w-full text-center text-white text-sm">
         {msg}
       </div>
 
-      {/* POPUP PREVIEW */}
       {previewImg && (
         <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-4 shadow-xl">
+          <div className="bg-white rounded-xl p-4">
             <img src={previewImg} className="w-64 rounded-lg" />
             <div className="text-center mt-3">
               <button

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, session } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -10,31 +10,41 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.ts"),
       contextIsolation: true,
       nodeIntegration: false,
+
+      // 🔥 BẮT BUỘC cho getUserMedia
+      sandbox: false,
     },
   });
 
-  // Dev: load Vite dev server
   if (!app.isPackaged) {
     win.loadURL("http://localhost:5173");
+    win.webContents.openDevTools();
   } else {
     win.loadFile(path.join(__dirname, "../dist/index.html"));
   }
 }
 
-// IPC Example
-ipcMain.handle("ping", async () => {
-  return "pong from main process";
-});
+function setupPermissions() {
+  const ses = session.defaultSession;
+
+  // ✅ CÁI DUY NHẤT CAMERA CẦN
+  ses.setPermissionRequestHandler((_, permission, callback) => {
+    if (permission === "media") {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+}
+
+ipcMain.handle("ping", async () => "pong");
 
 app.whenReady().then(() => {
+  setupPermissions();
   createWindow();
-
-  app.on("activate", function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
 });
 
 app.on("window-all-closed", () => {

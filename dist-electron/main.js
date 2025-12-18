@@ -1,25 +1,42 @@
-import { ipcMain as r, app as e, BrowserWindow as a } from "electron";
-import o from "path";
-import { fileURLToPath as l } from "url";
-const d = l(import.meta.url), i = o.dirname(d);
-function t() {
-  const n = new a({
+import { ipcMain, app, session, BrowserWindow } from "electron";
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename$1 = fileURLToPath(import.meta.url);
+const __dirname$1 = path.dirname(__filename$1);
+function createWindow() {
+  const win = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: o.join(i, "preload.js"),
-      contextIsolation: !0,
-      nodeIntegration: !1
+      preload: path.join(__dirname$1, "preload.ts"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      // 🔥 BẮT BUỘC cho getUserMedia
+      sandbox: false
     }
   });
-  e.isPackaged ? n.loadFile(o.join(i, "../dist/index.html")) : n.loadURL("http://localhost:5173");
+  if (!app.isPackaged) {
+    win.loadURL("http://localhost:5173");
+    win.webContents.openDevTools();
+  } else {
+    win.loadFile(path.join(__dirname$1, "../dist/index.html"));
+  }
 }
-r.handle("ping", async () => "pong from main process");
-e.whenReady().then(() => {
-  t(), e.on("activate", function() {
-    a.getAllWindows().length === 0 && t();
+function setupPermissions() {
+  const ses = session.defaultSession;
+  ses.setPermissionRequestHandler((_, permission, callback) => {
+    if (permission === "media") {
+      callback(true);
+    } else {
+      callback(false);
+    }
   });
+}
+ipcMain.handle("ping", async () => "pong");
+app.whenReady().then(() => {
+  setupPermissions();
+  createWindow();
 });
-e.on("window-all-closed", () => {
-  process.platform !== "darwin" && e.quit();
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
 });
