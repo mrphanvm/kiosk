@@ -1,9 +1,13 @@
-import { ipcMain, app, session, BrowserWindow } from "electron";
+import { ipcMain, app, session, systemPreferences, BrowserWindow } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 const __filename$1 = fileURLToPath(import.meta.url);
 const __dirname$1 = path.dirname(__filename$1);
 function createWindow() {
+  console.log("process", process.platform);
+  if (process.platform === "darwin" || process.platform === "win32") {
+    systemPreferences.askForMediaAccess("camera");
+  }
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -16,8 +20,7 @@ function createWindow() {
     }
   });
   if (!app.isPackaged) {
-    win.loadURL("http://localhost:5173");
-    win.webContents.openDevTools();
+    win.loadFile(path.join(__dirname$1, "../dist/index.html"));
   } else {
     win.loadFile(path.join(__dirname$1, "../dist/index.html"));
   }

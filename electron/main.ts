@@ -1,4 +1,10 @@
-import { app, BrowserWindow, ipcMain, session } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  session,
+  systemPreferences,
+} from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -6,6 +12,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function createWindow() {
+  console.log("process", process.platform);
+  if (process.platform === "darwin" || process.platform === "win32") {
+    // Check platform
+    systemPreferences.askForMediaAccess("camera");
+  }
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -20,8 +31,9 @@ function createWindow() {
   });
 
   if (!app.isPackaged) {
-    win.loadURL("http://localhost:5173");
-    win.webContents.openDevTools();
+    win.loadFile(path.join(__dirname, "../dist/index.html"));
+    // win.loadURL("http://localhost:5173");
+    // win.webContents.openDevTools();
   } else {
     win.loadFile(path.join(__dirname, "../dist/index.html"));
   }
@@ -29,8 +41,6 @@ function createWindow() {
 
 function setupPermissions() {
   const ses = session.defaultSession;
-
-  // ✅ CÁI DUY NHẤT CAMERA CẦN
   ses.setPermissionRequestHandler((_, permission, callback) => {
     if (permission === "media") {
       callback(true);

@@ -47,6 +47,8 @@ const CameraFace: React.FC<CameraFaceProps> = ({
   // ---------------- CAMERA ----------------
   const getUsbCameraDeviceId = async () => {
     await navigator.mediaDevices.getUserMedia({ video: true });
+    // const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cams = devices.filter((d) => d.kind === "videoinput");
     const usb = cams.find((d) =>
