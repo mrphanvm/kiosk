@@ -20,7 +20,8 @@ function createWindow() {
     }
   });
   if (!app.isPackaged) {
-    win.loadFile(path.join(__dirname$1, "../dist/index.html"));
+    win.loadURL("http://localhost:5173");
+    win.webContents.openDevTools();
   } else {
     win.loadFile(path.join(__dirname$1, "../dist/index.html"));
   }
