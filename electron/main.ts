@@ -14,7 +14,6 @@ const __dirname = path.dirname(__filename);
 function createWindow() {
   console.log("process", process.platform);
   if (process.platform === "darwin" || process.platform === "win32") {
-    // Check platform
     systemPreferences.askForMediaAccess("camera");
   }
   const win = new BrowserWindow({
@@ -24,14 +23,11 @@ function createWindow() {
       preload: path.join(__dirname, "preload.ts"),
       contextIsolation: true,
       nodeIntegration: false,
-
-      // 🔥 BẮT BUỘC cho getUserMedia
       sandbox: false,
     },
   });
 
   if (!app.isPackaged) {
-    // win.loadFile(path.join(__dirname, "../dist/index.html"));
     win.loadURL("http://localhost:5173");
     win.webContents.openDevTools();
   } else {

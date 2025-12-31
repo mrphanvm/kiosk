@@ -1,11 +1,11 @@
-import CameraFace from "../../components/CameraFace";
+import CameraFace from '../../components/CameraFace'
 
 const Camera = ({
   onCaptured,
   onBack,
 }: {
-  onCaptured: (img: string) => void;
-  onBack?: () => void;
+  onCaptured: (img: string) => void
+  onBack?: () => void
 }) => {
   return (
     <CameraFace
@@ -14,7 +14,7 @@ const Camera = ({
       onCapture={onCaptured}
       onBack={onBack}
     />
-  );
-};
+  )
+}
 
-export default Camera;
+export default Camera
