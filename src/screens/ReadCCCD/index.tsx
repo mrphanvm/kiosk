@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/purity */
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import ScanIcon from '@/assets/svg/ScanIcon'
 import { ChipReadResult } from '@/interfaces/chip.interface'
@@ -15,11 +15,8 @@ const ReadCCCD: React.FC<Props> = ({ onNext, onBack }) => {
   const [loading, setLoading] = useState(true)
   const [cccd, setCccd] = useState<any>(null)
   const handleSseMessage = useCallback((chipData: ChipReadResult) => {
-    console.log('chipData', chipData)
     const data = chipData?.data
-    console.log('data', data)
     if (!data?.cardData?.Dg13File) return
-
     setCccd({
       name: data.cardData.Dg13File.FullName,
       id: data.cardData.Dg13File.IdNumber,
