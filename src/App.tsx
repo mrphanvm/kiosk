@@ -4,17 +4,20 @@ import Menu from './screens/Menu'
 import ReadCCCD from './screens/ReadCCCD'
 import Camera from './screens/Camera'
 import { useFullscreenToggle } from './hooks/useFullscreenToggle'
+import { useFaceVerifyMutation } from './store/api/customerApi'
+import { base64ToBlob } from './utils/common.util'
 
 export type Screen = 'menu' | 'readCCCD' | 'camera' | 'result'
 
 const App = () => {
   useFullscreenToggle()
   const [screen, setScreen] = useState<Screen>('menu')
-
+  const [faceVerify] = useFaceVerifyMutation()
   // Data toàn bộ flow
   const [flowData, setFlowData] = useState({
     cccd: null as any,
     faceImage: null as string | null,
+    faceImages: [] as string[],
   })
 
   // ================================
@@ -31,7 +34,12 @@ const App = () => {
     }
 
     if (screen === 'camera') {
-      setFlowData((prev) => ({ ...prev, faceImage: data }))
+      const images = Array.isArray(data) ? data : []
+      setFlowData((prev) => ({
+        ...prev,
+        faceImage: images[0] ?? null,
+        faceImages: images,
+      }))
       return goTo('result')
     }
   }
@@ -40,7 +48,15 @@ const App = () => {
     if (screen === 'camera') return goTo('readCCCD')
     if (screen === 'readCCCD') return goTo('menu')
   }
-
+  const verifyFace = (img1: string, img2: string) => {
+    if (!img1 || !img2) return
+    const body = new FormData()
+    const img1Blob = base64ToBlob(img1)
+    body.append('img1', img1Blob, 'img1.jpg')
+    const img2Blob = base64ToBlob(img2)
+    body.append('img2', img2Blob, 'img2.jpg')
+    faceVerify(body)
+  }
   // ================================
   // RENDER SCREEN
   // ================================
@@ -54,9 +70,9 @@ const App = () => {
 
       {screen === 'camera' && (
         <Camera
-          onCaptured={(img) => {
-            console.log('img', img)
-            console.log('flowData.cccd', flowData)
+          onCaptured={(imgs) => {
+            if (imgs[0]) verifyFace(imgs[0], flowData.cccd?.avatar)
+            next(imgs)
           }}
           onBack={back}
         />
@@ -70,6 +86,7 @@ const App = () => {
             <div>
               <h2 className="text-lg mb-2">Ảnh CCCD</h2>
               <img
+                alt=""
                 src={
                   flowData.cccd?.avatar?.startsWith('data:image')
                     ? flowData.cccd.avatar
@@ -82,9 +99,13 @@ const App = () => {
             <div>
               <h2 className="text-lg mb-2">Ảnh Camera</h2>
               <img
+                alt=""
                 src={flowData.faceImage ?? ''}
                 className="w-40 rounded-lg border"
               />
+              <p className="text-xs mt-2 text-gray-300">
+                So anh da chup: {flowData.faceImages.length}/5
+              </p>
             </div>
           </div>
 

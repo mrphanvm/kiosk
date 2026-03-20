@@ -10,6 +10,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const devServerUrl = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
 
 function createWindow() {
   console.log("process", process.platform);
@@ -28,7 +29,7 @@ function createWindow() {
   });
 
   if (!app.isPackaged) {
-    win.loadURL("http://localhost:5173");
+    win.loadURL(devServerUrl);
     win.webContents.openDevTools();
   } else {
     win.loadFile(path.join(__dirname, "../dist/index.html"));

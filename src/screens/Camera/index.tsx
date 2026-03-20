@@ -4,7 +4,7 @@ const Camera = ({
   onCaptured,
   onBack,
 }: {
-  onCaptured: (img: string) => void
+  onCaptured: (imgs: string[]) => void
   onBack?: () => void
 }) => {
   return (

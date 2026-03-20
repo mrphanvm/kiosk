@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 const __filename$1 = fileURLToPath(import.meta.url);
 const __dirname$1 = path.dirname(__filename$1);
+const devServerUrl = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
 function createWindow() {
   console.log("process", process.platform);
   if (process.platform === "darwin" || process.platform === "win32") {
@@ -15,12 +16,11 @@ function createWindow() {
       preload: path.join(__dirname$1, "preload.ts"),
       contextIsolation: true,
       nodeIntegration: false,
-      // 🔥 BẮT BUỘC cho getUserMedia
       sandbox: false
     }
   });
   if (!app.isPackaged) {
-    win.loadURL("http://localhost:5173");
+    win.loadURL(devServerUrl);
     win.webContents.openDevTools();
   } else {
     win.loadFile(path.join(__dirname$1, "../dist/index.html"));
