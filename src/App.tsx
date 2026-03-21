@@ -3,16 +3,21 @@ import React, { useState } from 'react'
 import Menu from './screens/Menu'
 import ReadCCCD from './screens/ReadCCCD'
 import Camera from './screens/Camera'
+import Confirm from './screens/Confirm'
 import { useFullscreenToggle } from './hooks/useFullscreenToggle'
-import { useFaceVerifyMutation } from './store/api/customerApi'
+import {
+  useCheckinMutation,
+  useFaceVerifyMutation,
+} from './store/api/customerApi'
 import { base64ToBlob } from './utils/common.util'
 
-export type Screen = 'menu' | 'readCCCD' | 'camera' | 'result'
+export type Screen = 'menu' | 'readCCCD' | 'camera' | 'confirm' | 'result'
 
 const App = () => {
   useFullscreenToggle()
   const [screen, setScreen] = useState<Screen>('menu')
   const [faceVerify] = useFaceVerifyMutation()
+  const [checkin] = useCheckinMutation()
   // Data toàn bộ flow
   const [flowData, setFlowData] = useState({
     cccd: null as any,
@@ -26,6 +31,7 @@ const App = () => {
   const goTo = (scr: Screen) => setScreen(scr)
 
   const next = (data?: any) => {
+    console.log('next called, screen:', screen, 'data:', data)
     if (screen === 'menu') return goTo('readCCCD')
 
     if (screen === 'readCCCD') {
@@ -40,9 +46,18 @@ const App = () => {
         faceImage: images[0] ?? null,
         faceImages: images,
       }))
-      return goTo('result')
+      // KHÔNG gọi goTo('confirm') ở đây nữa
     }
   }
+
+  // Theo dõi flowData.faceImages, nếu đủ 5 ảnh thì chuyển sang màn hình confirm
+
+  React.useEffect(() => {
+    console.log('flowData.faceImages, screen:', flowData.faceImages, screen)
+    if (screen === 'camera' && flowData.faceImages.length === 5) {
+      goTo('confirm')
+    }
+  }, [flowData.faceImages, screen])
 
   const back = () => {
     if (screen === 'camera') return goTo('readCCCD')
@@ -78,49 +93,59 @@ const App = () => {
         />
       )}
 
+      {screen === 'confirm' && (
+        <Confirm
+          cccdInfo={{
+            name: flowData.cccd?.name || '',
+            id: flowData.cccd?.id || '',
+            dob: flowData.cccd?.dob || '',
+            address: flowData.cccd?.address || '',
+          }}
+          images={flowData.faceImages}
+          onRegister={async () => {
+            // Chuẩn bị formData
+            const formData = new FormData()
+            formData.append('fullName', flowData.cccd?.name || '')
+            formData.append('pid', flowData.cccd?.id || '')
+            formData.append('gender', flowData.cccd?.gender || '')
+            formData.append('hometown', '') // Nếu có trường này trong CCCD thì truyền vào
+            formData.append('permanent', flowData.cccd?.address || '')
+            formData.append('dateOfBirth', flowData.cccd?.dob || '')
+            formData.append('nationality', 'Vietnam')
+            formData.append('issueDate', '2024-01-15') // Nếu có trường này thì lấy từ CCCD
+            formData.append('type', 'CLIENT')
+            formData.append('isActive', 'true')
+            formData.append('primaryFaceSampleIndex', '0')
+            // Ảnh CCCD
+            if (flowData.cccd?.avatar) {
+              const identityBlob = base64ToBlob(flowData.cccd.avatar)
+              formData.append('identityImage', identityBlob, 'cccd.jpg')
+            }
+            // 5 ảnh khuôn mặt
+            flowData.faceImages.forEach((img, idx) => {
+              const blob = base64ToBlob(img)
+              formData.append('faceSamples', blob, `face-${idx + 1}.jpg`)
+            })
+            try {
+              await checkin(formData)
+            } catch (e) {
+              console.error('Checkin error', e)
+            }
+            goTo('result')
+          }}
+        />
+      )}
+
       {screen === 'result' && (
-        <div className="w-screen h-screen bg-black text-white flex flex-col items-center justify-center gap-6">
-          <h1 className="text-2xl font-bold">Kết quả cuối</h1>
-
-          <div className="flex gap-8">
-            <div>
-              <h2 className="text-lg mb-2">Ảnh CCCD</h2>
-              <img
-                alt=""
-                src={
-                  flowData.cccd?.avatar?.startsWith('data:image')
-                    ? flowData.cccd.avatar
-                    : `data:image/jpeg;base64,${flowData.cccd?.avatar}`
-                }
-                className="w-40 rounded-lg border"
-              />
-            </div>
-
-            <div>
-              <h2 className="text-lg mb-2">Ảnh Camera</h2>
-              <img
-                alt=""
-                src={flowData.faceImage ?? ''}
-                className="w-40 rounded-lg border"
-              />
-              <p className="text-xs mt-2 text-gray-300">
-                So anh da chup: {flowData.faceImages.length}/5
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => alert('Match face API goes here')}
-            className="px-6 py-3 bg-blue-500 rounded-xl"
-          >
-            Tiến hành so khớp
-          </button>
-
+        <div className="w-screen h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0a1830] to-[#1a2a40] text-white">
+          <h1 className="text-3xl font-bold mb-8 text-cyan-400 drop-shadow-lg">
+            Đăng ký thành công!
+          </h1>
           <button
             onClick={() => goTo('menu')}
-            className="px-6 py-3 bg-gray-600 rounded-xl mt-4"
+            className="px-10 py-3 rounded-full bg-gradient-to-r from-cyan-400 to-blue-600 text-xl font-bold shadow-xl hover:scale-105 hover:from-cyan-300 hover:to-blue-500 transition-all border-2 border-cyan-500/60 tracking-widest mt-8"
           >
-            Quay về menu
+            Quay lại màn hình chính
           </button>
         </div>
       )}

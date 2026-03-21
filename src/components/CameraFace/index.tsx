@@ -4,7 +4,6 @@ import {
   FaceLandmarker,
   type FaceLandmarkerResult,
 } from "@mediapipe/tasks-vision";
-
 interface CameraFaceProps {
   size?: number;
   autoCaptureFrames?: number;
@@ -16,7 +15,7 @@ type PoseKey = "front" | "left" | "right" | "up" | "down";
 
 const CameraFace: React.FC<CameraFaceProps> = ({
   size = 360,
-  autoCaptureFrames = 12,
+  autoCaptureFrames = 4,
   onCapture,
   onBack,
 }) => {
@@ -43,11 +42,11 @@ const CameraFace: React.FC<CameraFaceProps> = ({
   const [capturedPoseCount, setCapturedPoseCount] = useState(0);
 
   const poseTargets = {
-    front: { label: "Nhìn chính diện", check: (yaw: number, pitch: number) => Math.abs(yaw) < 0.14 && Math.abs(pitch) < 0.14 },
-    left: { label: "Quay mặt sang trái", check: (yaw: number) => yaw > 0.14 },
-    right: { label: "Quay mặt sang phải", check: (yaw: number) => yaw < -0.14 },
-    up: { label: "Ngẩng mặt lên", check: (_yaw: number, pitch: number) => pitch < -0.1 },
-    down: { label: "Cúi mặt xuống", check: (_yaw: number, pitch: number) => pitch > 0.12 },
+    front: { label: "Nhìn chính diện", check: (yaw: number, pitch: number) => Math.abs(yaw) < 0.5 && Math.abs(pitch) < 0.5 },
+    left: { label: "Quay mặt sang trái", check: (yaw: number) => yaw > 0.02 },
+    right: { label: "Quay mặt sang phải", check: (yaw: number) => yaw < -0.02 },
+    up: { label: "Ngẩng mặt lên", check: (_yaw: number, pitch: number) => pitch < 0.08 },
+    down: { label: "Cúi mặt xuống", check: (_yaw: number, pitch: number) => pitch > 0.0 },
   } as const;
 
   const outputPoseOrder: PoseKey[] = ["front", "left", "right", "up", "down"];
@@ -57,10 +56,10 @@ const CameraFace: React.FC<CameraFaceProps> = ({
       .filter((k) => !capturedByPoseRef.current[k])
       .map((k) => poseTargets[k].label);
 
+  // Nhận diện góc chưa chụp, không ưu tiên cứng thứ tự
   const getMatchedPoseKey = (yaw: number, pitch: number): PoseKey | null => {
-    // ưu tiên các góc quay/ngửa/cúi trước, chính diện sau cùng
-    const priority: PoseKey[] = ["left", "right", "up", "down", "front"];
-    for (const key of priority) {
+    const missing: PoseKey[] = outputPoseOrder.filter((k) => !capturedByPoseRef.current[k]);
+    for (const key of missing) {
       if (poseTargets[key].check(yaw, pitch)) return key;
     }
     return null;
@@ -130,6 +129,9 @@ const CameraFace: React.FC<CameraFaceProps> = ({
     ctx.beginPath();
     ctx.ellipse(c.width / 2, c.height / 2, rx, ry, 0, 0, Math.PI * 2);
     ctx.clip();
+    // Mirror video horizontally for correct left/right
+    ctx.translate(c.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(v, offsetX - (cw / 2 - rx), offsetY - (ch / 2 - ry), drawW, drawH);
     ctx.restore();
     return c.toDataURL("image/png");
@@ -167,7 +169,8 @@ const CameraFace: React.FC<CameraFaceProps> = ({
   // ─────────────────────────────────────────────────
   // DRAW: Full-screen tech background
   // ─────────────────────────────────────────────────
-  const drawBackground = (ctx: CanvasRenderingContext2D, sw: number, sh: number, ts: number) => {
+  // Draws the tech background and mirrors the video horizontally for user-friendly camera
+  const drawBackground = (ctx: CanvasRenderingContext2D, sw: number, sh: number, ts: number, video?: HTMLVideoElement) => {
     ctx.clearRect(0, 0, sw, sh);
     const cx = sw / 2, cy = sh / 2;
 
@@ -240,6 +243,8 @@ const CameraFace: React.FC<CameraFaceProps> = ({
     const scanY = (ts * 0.08) % sh;
     ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(sw, scanY); ctx.stroke();
     ctx.restore();
+
+    // Không vẽ video lên background canvas nữa. Chỉ vẽ hiệu ứng tech (grid, radar, particles...)
   };
 
   // ─────────────────────────────────────────────────
@@ -254,18 +259,33 @@ const CameraFace: React.FC<CameraFaceProps> = ({
     const rx = radius * 1.68;
     const ry = radius * 2.22;
 
-    // Cut out oval (show video below)
+    // Cut out oval (show mirrored video below)
     ctx.save();
     ctx.globalCompositeOperation = "destination-out";
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.clip();
+    // Mirror video horizontally for correct left/right
+    const v = videoRef.current;
+    if (v && v.videoWidth && v.videoHeight) {
+      ctx.save();
+      ctx.translate(cw, 0);
+      ctx.scale(-1, 1);
+      // Calculate drawW/drawH/offsetX/offsetY similar to captureOuterEllipse
+      const vw = v.videoWidth, vh = v.videoHeight;
+      const scale = Math.max(cw / vw, ch / vh);
+      const drawW = vw * scale, drawH = vh * scale;
+      const offsetX = (cw - drawW) / 2, offsetY = (ch - drawH) / 2;
+      // Adjust offsetX for mirroring to keep video centered
+      ctx.drawImage(v, cw - offsetX - drawW, offsetY, drawW, drawH);
+      ctx.restore();
+    }
     ctx.restore();
 
     // Neon glow ring
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 8;
     ctx.strokeStyle = "rgba(0,200,255,0.95)";
     ctx.shadowColor = "rgba(0,200,255,0.85)";
     ctx.shadowBlur = 24;
@@ -398,7 +418,8 @@ const CameraFace: React.FC<CameraFaceProps> = ({
       bgCanvas.style.height = `${sh}px`;
       const bCtx = bgCanvas.getContext("2d")!;
       bCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      drawBackground(bCtx, sw, sh, ts);
+      // Pass the video element to drawBackground for mirroring
+      drawBackground(bCtx, sw, sh, ts, v);
     }
 
     // Alignment detection
@@ -461,12 +482,23 @@ const CameraFace: React.FC<CameraFaceProps> = ({
           .filter((v): v is string => Boolean(v));
         setCapturedPoseCount(imageList.length);
 
+        // Log captured poses to console
+        const capturedLabels = outputPoseOrder
+          .filter((k) => capturedByPoseRef.current[k])
+          .map((k) => poseTargets[k].label);
+        console.log("Đã chụp các góc:", capturedLabels);
+
         if (imageList.length >= outputPoseOrder.length) {
-          const orderedOutput = outputPoseOrder
-            .map((k) => capturedByPoseRef.current[k])
-            .filter((v): v is string => Boolean(v));
+          // Đảm bảo chỉ gọi onCapture một lần duy nhất
+          setTimeout(() => {
+            if (onCapture) {
+              const orderedOutput = outputPoseOrder
+                .map((k) => capturedByPoseRef.current[k])
+                .filter((v): v is string => Boolean(v));
+              onCapture(orderedOutput);
+            }
+          }, 350);
           setMsg("Đã chụp đủ 5 góc khuôn mặt");
-          onCapture?.(orderedOutput);
         } else {
           const missing = getMissingPoseLabels();
           stable.current = 0;
@@ -525,6 +557,9 @@ const CameraFace: React.FC<CameraFaceProps> = ({
       if (video) video.srcObject = null;
       detectorRef.current?.close();
       detectorRef.current = null;
+      // Reset capturedByPoseRef và capturingRef khi unmount
+      Object.keys(capturedByPoseRef.current).forEach(k => { delete capturedByPoseRef.current[k as PoseKey]; });
+      capturingRef.current = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

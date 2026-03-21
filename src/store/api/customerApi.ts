@@ -10,7 +10,15 @@ export const customerApi = api.injectEndpoints({
       }),
       transformResponse: (response: any) => response,
     }),
+    checkin: builder.mutation<any, any>({
+      query: (formData) => ({
+        url: "/api/v1/integration/customers/kiot-registration",
+        method: "POST",
+        body: formData,
+      }),
+      transformResponse: (response: any) => response,
+    }),
   }),
 });
 
-export const { useFaceVerifyMutation } = customerApi;
+export const { useFaceVerifyMutation, useCheckinMutation } = customerApi;
