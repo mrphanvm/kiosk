@@ -5,6 +5,10 @@ import ScanIcon from '@/assets/svg/ScanIcon'
 import { ChipReadResult } from '@/interfaces/chip.interface'
 import { useSse } from '@/hooks/useSse'
 import { SSE_HOST } from '@/config/constant'
+import dayjs from 'dayjs'
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+dayjs.extend(customParseFormat);
 
 interface Props {
   onNext: (data: any) => void
@@ -46,15 +50,24 @@ const ReadCCCD: React.FC<Props> = ({ onNext, onBack }) => {
 
   const handleSseMessage = useCallback((chipData: ChipReadResult) => {
     const data = chipData?.data
+    console.log('SSE_HOST', data)
     if (!data?.cardData?.Dg13File) return
-
+    console.log('data.cardData.Dg13File.DateOfBirth',data.cardData.Dg13File.DateOfBirth)
+    console.log("CCCD",{
+      name: data.cardData.Dg13File.Name,
+      id: data.cardData.Dg13File.DocumentNumber,
+      dob: dayjs(data.cardData.Dg13File.DateOfBirth,  'DD/MM/YYYY').toDate().toISOString(),
+      gender: data.cardData.Dg13File.Sex == "Nam" ?'M':'F',
+      address: data.cardData.Dg13File.Hometown,
+      avatar: data.cardData?.Dg2File.FaceImage,
+    })
     setCccd({
-      name: data.cardData.Dg13File.FullName,
-      id: data.cardData.Dg13File.IdNumber,
-      dob: data.cardData.Dg13File.DateOfBirth,
-      gender: data.cardData.Dg13File.Sex,
-      address: data.cardData.Dg13File.Address,
-      avatar: data.faceImage?.base64,
+      name: data.cardData.Dg13File.Name,
+      id: data.cardData.Dg13File.DocumentNumber,
+      dob: dayjs(data.cardData.Dg13File.DateOfBirth,  'DD/MM/YYYY').toDate().toISOString(),
+      gender: data.cardData.Dg13File.Sex == "Nam" ?'M':'F',
+      address: data.cardData.Dg13File.Hometown,
+      avatar: data.cardData?.Dg2File.FaceImage,
     })
     setLoading(false)
   }, [])

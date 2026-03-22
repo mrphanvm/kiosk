@@ -15,13 +15,16 @@ export interface CardData {
     Mrz: string;
   };
   Dg13File: {
-    FullName: string;
+    Name: string;
     DateOfBirth: string; // yyyy-mm-dd
-    Sex: "M" | "F" | string;
+    Sex: "Nam" | "Nu" | string;
     Nationality: string;
-    IdNumber: string;
-    Address: string;
+    DocumentNumber: string;
+    Hometown: string;
   };
+  Dg2File: {
+    FaceImage: string 
+  }
   VerifySOD: Record<string, any>;
   AaCaAuthen: Record<string, any>;
 }
