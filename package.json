@@ -22,6 +22,7 @@
   "scripts": {
     "dev": "vite",
     "electron": "electron .",
+    "start:prod": "npm run build && electron .",
     "dev:electron": "concurrently \"npm run dev\" \"npm run electron\"",
     "build": "vite build",
     "build:electron": "electron-builder",
